@@ -1,39 +1,83 @@
-name: Auto Deploy to Local macOS
+name: Auto Deploy to Local Machine
 
 on:
   push:
     branches:
-      - main # Kích hoạt workflow khi có push lên branch main
+      - main
 
 jobs:
   deploy:
-    runs-on: [self-hosted, macos, local-deploy] # Chỉ định runner của bạn bằng các tag
-
+    runs-on: self-hosted
+    
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js (ví dụ nếu project của bạn dùng Node.js)
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-
-    - name: Install dependencies
-      run: npm install # Hoặc pip install -r requirements.txt, composer install, v.v.
-
-    - name: Build project (nếu có)
-      run: npm run build
-
-    - name: Restart application server
+    - name: Check Node.js version
       run: |
-        # Các lệnh để dừng và khởi động lại server của bạn
-        # Ví dụ: Dừng tiến trình cũ
-        # pkill -f "node your_app.js"
-        # Khởi động lại server
-        # nohup node your_app.js & # Hoặc sử dụng PM2, launchd
-        echo "Application restarted on local macOS machine."
+        echo "Node.js version:"
+        node --version || echo "Node.js not installed"
+        echo "NPM version:"
+        npm --version || echo "NPM not installed"
 
-    - name: Clean up (tùy chọn)
+    - name: Install dependencies (if package.json exists)
       run: |
-        # Xóa các file tạm hoặc cache nếu cần
-        echo "Cleanup complete."
+        if [ -f "package.json" ]; then
+          echo "Installing dependencies..."
+          npm install
+        else
+          echo "No package.json found, skipping npm install"
+        fi
+
+    - name: Build project (if build script exists)
+      run: |
+        if [ -f "package.json" ] && npm run build --if-present; then
+          echo "Build completed successfully"
+        else
+          echo "No build script found or build not needed"
+        fi
+
+    - name: Deploy to local directory
+      run: |
+        # Tạo thư mục deploy nếu chưa có
+        DEPLOY_DIR="$HOME/deployed-apps/demo-playwright"
+        mkdir -p "$DEPLOY_DIR"
+        
+        # Copy files to deploy directory
+        echo "Copying files to $DEPLOY_DIR"
+        cp -r * "$DEPLOY_DIR/" 2>/dev/null || true
+        
+        echo "Deployment completed to: $DEPLOY_DIR"
+        echo "Files deployed:"
+        ls -la "$DEPLOY_DIR"
+
+    - name: Start local server (optional)
+      run: |
+        # Kiểm tra nếu có server đang chạy trên port 8080
+        if lsof -ti:8080; then
+          echo "Stopping existing server on port 8080"
+          kill $(lsof -ti:8080) || true
+          sleep 2
+        fi
+        
+        # Khởi động server đơn giản cho static files
+        cd "$HOME/deployed-apps/demo-playwright"
+        echo "Starting local server on http://localhost:8080"
+        nohup python3 -m http.server 8080 > server.log 2>&1 &
+        
+        # Đợi server khởi động
+        sleep 3
+        
+        # Kiểm tra server
+        if curl -s http://localhost:8080 > /dev/null; then
+          echo "✅ Server started successfully at http://localhost:8080"
+        else
+          echo "❌ Failed to start server"
+        fi
+
+    - name: Cleanup
+      run: |
+        echo "Cleaning up temporary files..."
+        # Xóa các file tạm nếu có
+        rm -f *.tmp 2>/dev/null || true
+        echo "✅ Deployment process completed!"
