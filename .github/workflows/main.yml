@@ -1,0 +1,39 @@
+name: Auto Deploy to Local macOS
+
+on:
+  push:
+    branches:
+      - main # Kích hoạt workflow khi có push lên branch main
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, macos, local-deploy] # Chỉ định runner của bạn bằng các tag
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js (ví dụ nếu project của bạn dùng Node.js)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install # Hoặc pip install -r requirements.txt, composer install, v.v.
+
+    - name: Build project (nếu có)
+      run: npm run build
+
+    - name: Restart application server
+      run: |
+        # Các lệnh để dừng và khởi động lại server của bạn
+        # Ví dụ: Dừng tiến trình cũ
+        # pkill -f "node your_app.js"
+        # Khởi động lại server
+        # nohup node your_app.js & # Hoặc sử dụng PM2, launchd
+        echo "Application restarted on local macOS machine."
+
+    - name: Clean up (tùy chọn)
+      run: |
+        # Xóa các file tạm hoặc cache nếu cần
+        echo "Cleanup complete."
